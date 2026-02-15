@@ -20,10 +20,7 @@ class Users(Base):
 	name: Mapped[str] = mapped_column(String(255))
 	role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
 	role: Mapped["Roles"] = relationship(back_populates="users")
-	created_at: Mapped[datetime] = mapped_column(
-		DateTime(timezone=True),
-		server_default=func.now()
-	)
+	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 	hashed_pass: Mapped[str] = mapped_column(String(255))
 
 	role: Mapped["Roles"] = relationship(back_populates="users")
@@ -177,4 +174,12 @@ def seed_defaults(session):
 			Request_Types(type_name="overtid"),
 		])
 	
+	existing_users = session.execute(select(Users)).scalars().all()
+	if not existing_users:
+		role_leder = session.execute(select(Roles).where(Roles.role == "leder")).scalars().first()
+
+		session.add_all([
+			Users(name="Admin", role=role_leder, hashed_pass="")
+		])
+
 	session.commit()
