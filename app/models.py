@@ -1,8 +1,11 @@
-from time import timezone
+import random 
+import string
+from datetime import timezone
 from sqlalchemy import String, Boolean, Integer, ForeignKey, DateTime, func, Date, Time, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timedelta
 from .database import Base
+from .security import *
 
 class Roles(Base):
 	__tablename__ = "roles"
@@ -17,14 +20,14 @@ class Users(Base):
 
 	##Table Fields
 	id: Mapped[int] = mapped_column(primary_key=True)
+	username: Mapped[str] = mapped_column(String(32), unique=True)
 	name: Mapped[str] = mapped_column(String(255))
 	role_id: Mapped[int] = mapped_column(ForeignKey("roles.id"))
-	role: Mapped["Roles"] = relationship(back_populates="users")
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 	hashed_pass: Mapped[str] = mapped_column(String(255))
 
 	role: Mapped["Roles"] = relationship(back_populates="users")
-	sessions: Mapped[list["Sessions"]] = relationship(back_populates="user")
+	sessions: Mapped[list["Sessions"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 	scheduled_times: Mapped[list["Scheduled_Times"]] = relationship(back_populates="user")
 	worked_times: Mapped[list["Worked_Times"]] = relationship(back_populates="user")
 	logs: Mapped[list["Logs"]] = relationship(back_populates="user")
@@ -48,7 +51,7 @@ class Sessions(Base):
 	__tablename__ = "sessions"
 	
 	id: Mapped[int] = mapped_column(primary_key=True)
-	session_token: Mapped[str] = mapped_column(String(32))
+	session_token: Mapped[str] = mapped_column(String(32), default=lambda: ''.join(random.choices(string.ascii_letters + string.digits, k=32)))
 	activeUntil: Mapped[datetime] = mapped_column(
 		DateTime(timezone=True),
 		default=lambda: datetime.now(timezone.utc) + timedelta(days=1),
@@ -164,6 +167,7 @@ def seed_defaults(session):
 			Roles(role="leder"),
 			Roles(role="medarbejder"),
 		])
+	session.commit()
 
 	# Request Types
 	existing_types = session.execute(select(Request_Types)).scalars().all()
@@ -173,13 +177,14 @@ def seed_defaults(session):
 			Request_Types(type_name="sygdom"),
 			Request_Types(type_name="overtid"),
 		])
+	session.commit()
 	
 	existing_users = session.execute(select(Users)).scalars().all()
 	if not existing_users:
 		role_leder = session.execute(select(Roles).where(Roles.role == "leder")).scalars().first()
 
 		session.add_all([
-			Users(name="Admin", role=role_leder, hashed_pass="")
+			Users(username="Admin", name="Admin", role=role_leder, hashed_pass=get_password_hash("1234"))
 		])
 
 	session.commit()
