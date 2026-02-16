@@ -1,5 +1,7 @@
+import asyncio
 from fastapi import FastAPI, Depends
 from fastapi.params import Body, Header
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 from .database import Base, engine, SessionLocal
 from .models import *
@@ -14,7 +16,29 @@ try:
 finally:
     db.close()
 
-app = FastAPI()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async def periodic_cleanup():
+        while True:
+            db = SessionLocal()
+            try:
+                db.execute(
+                    delete(Sessions).where(
+                        Sessions.activeUntil < datetime.now(timezone.utc)
+                    )
+                )
+                db.commit()
+            finally:
+                db.close()
+            await asyncio.sleep(3600)  # every hour
+
+    task = asyncio.create_task(periodic_cleanup())
+    yield
+    task.cancel()
+
+app = FastAPI(lifespan=lifespan)
 
 def get_db():
     db = SessionLocal()
@@ -139,8 +163,6 @@ def users_get(session_token: str = Header(None), amount: int = Header(10), page:
             "role": user.role, 
         } for user in user_to_get]
     return {"message": "Succesfully got users", "users": users_list}
-
-
 
 
 def log(event: str, user_id: int, db: Session):
