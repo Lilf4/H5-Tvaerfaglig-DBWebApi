@@ -60,7 +60,12 @@ class Sessions(Base):
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 	user: Mapped["Users"] = relationship(back_populates="sessions")
 
+class CheckinDeviceCode(Base):
+	__tablename__ = "checkin_device_code"
 
+	id: Mapped[int] = mapped_column(primary_key=True)
+	name: Mapped[str] = mapped_column(String(50))
+	code: Mapped[str] = mapped_column(String(32), default=lambda: ''.join(random.choices(string.ascii_letters + string.digits, k=32)))
   
 class Scheduled_Times(Base):
 	__tablename__ = "scheduled_times"
@@ -68,7 +73,7 @@ class Scheduled_Times(Base):
 	id: Mapped[int] = mapped_column(primary_key=True)
 	weekDay: Mapped[int] = mapped_column(Integer())
 	startTime: Mapped[datetime.time] = mapped_column(Time())
-	duration: Mapped[int] = mapped_column(Integer())
+	endTime: Mapped[datetime.time] = mapped_column(Time())
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 	user: Mapped["Users"] = relationship(back_populates="scheduled_times")
 
@@ -83,11 +88,13 @@ class Worked_Times(Base):
 	weekDay: Mapped[int] = mapped_column(Integer())
 	
 	actualStart: Mapped[datetime.time] = mapped_column(Time())
-	actualDuration: Mapped[int] = mapped_column(Integer())
+	actualEnd: Mapped[datetime.time] = mapped_column(Time(), nullable=True)
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-	user: Mapped["Users"] = relationship(back_populates="worked_times")
-
 	note: Mapped[str] = mapped_column(String(500))
+
+	active: Mapped[bool] = mapped_column(Boolean())
+
+	user: Mapped["Users"] = relationship(back_populates="worked_times")
 
 class Logs(Base):
 	__tablename__ = "logs"
