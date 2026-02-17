@@ -296,16 +296,18 @@ def check_out_code_get(device_code: str = Header(...), db: Session = Depends(get
     if not request_device: return {"message": "Invalid device code"}, 400
     return {"message": "Sucessfully got check in code", "code": CurrCheckInCode}, 200
 
-#TODO: Doesn't stop wrong codes, also allows checking out on already checked out work time.
 @app.post("/check_in_out")
 def check_in(session_token: str = Header(...), check_in_code: str = Header(None), db: Session = Depends(get_db)):
     global LastCheckInCode, GenTime, CurrCheckInCode
     request_user = validate_session(session_token, db)
     if not request_user: return {"message": "Invalid session"}, 400
-    if check_in_code != CurrCheckInCode and (check_in_code != LastCheckInCode and (GenTime + timedelta(minutes=MinBufferTime) <= datetime.now())):
+    if (check_in_code != CurrCheckInCode and not (check_in_code == LastCheckInCode and GenTime + timedelta(minutes=MinBufferTime) > datetime.now())):
         return {"message": "Invalid check in code"}, 400
     gen_check_in_code()
-    curr_work_time = db.query(Worked_Times).filter(Worked_Times.user_id == request_user.id and Worked_Times.active == True).first()
+    gen_check_in_code()
+    curr_work_time = db.query(Worked_Times).filter(
+        (Worked_Times.user_id == request_user.id) & (Worked_Times.active == True)
+    ).first()
     if not curr_work_time:
         new_work_time = Worked_Times(
             actualDate=datetime.now(),
@@ -334,7 +336,31 @@ def gen_check_in_code():
     LastCheckInCode = CurrCheckInCode
     GenTime = datetime.now()
     CurrCheckInCode = new_code
-    
+
+#TODO: TODO: TODO: TODO
+@app.post("/request")
+def request_create():
+    pass
+
+@app.put("/request")
+def request_update():
+    pass
+
+@app.delete("/request")
+def request_delete():
+    pass
+
+@app.get("/request")
+def request_get():
+    pass
+
+@app.get("/requests/{user_id}")
+def user_requests_get():
+    pass
+
+@app.get("/requests")
+def requests_get():
+    pass
 
 def log(event: str, user_id: int, db: Session):
     new_log = Logs(
