@@ -422,6 +422,8 @@ def process_request(session_token: str = Header(...), process_request: Process_R
     request_user = validate_session(session_token, db)
     if not request_user: return {"message": "Invalid session"}, 400
     if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    process_request_check = db.query(Processed_Requests).filter(Processed_Requests.request_id == process_request.request_id).first()
+    if process_request_check: return {"message": "Cannot process already processed request"}, 400 
     processed_request = Processed_Requests(
         request_id=process_request.request_id,
         accepted=process_request.accepted,
