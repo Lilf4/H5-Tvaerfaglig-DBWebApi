@@ -120,12 +120,12 @@ class Requests(Base):
 
 	id: Mapped[int] = mapped_column(primary_key=True)
 	reason: Mapped[str] = mapped_column(String(500))
-	weekDay: Mapped[int] = mapped_column(Integer())
-	startTime: Mapped[datetime.time] = mapped_column(Time())
-	duration: Mapped[int] = mapped_column(Integer())
+	startDay: Mapped[datetime] = mapped_column(Date())
+	endDay: Mapped[datetime] = mapped_column(Date())
 	type_id: Mapped[int] = mapped_column(ForeignKey("request_types.id"))
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 	requested_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+
 	type: Mapped["Request_Types"] = relationship(back_populates="requests")
 
 	user: Mapped["Users"] = relationship(
@@ -183,6 +183,8 @@ def seed_defaults(session):
 			Request_Types(type_name="ferie"),
 			Request_Types(type_name="sygdom"),
 			Request_Types(type_name="overtid"),
+			Request_Types(type_name="check-in"),
+			Request_Types(type_name="check-ud"),
 		])
 	session.commit()
 	

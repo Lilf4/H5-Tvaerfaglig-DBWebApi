@@ -15,4 +15,18 @@ class Schedule_Times:
     startTime: time = None
     endTime: time = None
     user_id: int = -1
-    inactive: bool = False
+    inactive: bool = None
+
+@dataclass
+class Request:
+    reason: str = None
+    startDay: datetime = None
+    endDay: datetime = None
+    type_id: int = -1
+    user_id: int = -1
+
+@dataclass
+class Process_Request:
+    request_id: int = -1
+    accepted: bool = None
+    reason: str = None

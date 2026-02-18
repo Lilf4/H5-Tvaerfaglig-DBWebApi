@@ -9,6 +9,7 @@ from .database import Base, engine, SessionLocal
 from .models import *
 from .security import *
 from .requestmodels import *
+from sqlalchemy import or_
 Base.metadata.create_all(bind=engine)
 
 LastCheckInCode: str = None
@@ -234,7 +235,7 @@ def scheduled_time_update(session_token: str = Header(...), schedule_id: int = P
     if schedule.endTime: schedule_to_update.endTime = schedule.endTime
     if schedule.startTime: schedule_to_update.weekDay = schedule.weekDay
     if schedule.user_id != -1: schedule_to_update.user_id = schedule.user_id
-    if schedule.inactive != schedule_to_update.inactive: schedule_to_update.inactive = schedule.inactive
+    if schedule.inactive != None: schedule_to_update.inactive = schedule.inactive
     db.commit()
     log(f"Schedule with id \"{schedule_to_update.id}\" was updated", request_user.id, db)
     return {"Sucessfully updated schedule"}, 200
@@ -339,28 +340,113 @@ def gen_check_in_code():
 
 #TODO: TODO: TODO: TODO
 @app.post("/request")
-def request_create():
-    pass
+def request_create(session_token: str = Header(...), request: Request = Body(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    new_request = Requests(
+        startDay=request.startDay,
+        endDay=request.endDay,
+        reason=request.reason,
+        type_id=request.type_id,
+        user_id=request.user_id,
+        requested_by=request_user.id
+    )
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+    log(f"Request with id \"{new_request.id}\" has been created", request_user.id, db)
+    return {"message": "request sucessfully created"}, 201
 
-@app.put("/request")
-def request_update():
-    pass
+@app.delete("/request/{request_id}")
+def request_delete(session_token: str = Header(...), request_id: int = Path(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    request_to_delete = db.query(Requests).filter(Requests.id == request_id).first()
+    if not request_to_delete: return {"message": "Couldn't find request"}, 404
+    if not request_user.role.role == 'leder':
+        if (not request_user.role.role == 'leder' and not request_user.id == request_to_delete.requested_by): 
+            if (not request_user.role.role == 'leder' and not request_user.id == request_to_delete.user_id):
+                return {"message": "Invalid Permissions"}, 401
+    processed_request = db.query(Processed_Requests).filter(Processed_Requests.request_id == request_to_delete.id).first()
+    if processed_request: return {"message": "Can't delete processed request"}, 405
+    log(f"Request with id \"{request_to_delete.id}\" has been deleted", request_user.id, db)
+    db.delete(request_to_delete)
+    db.commit()
+    return {"message": "Successfully deleted request"}, 200
 
-@app.delete("/request")
-def request_delete():
-    pass
+@app.get("/request/{request_id}&{get_processed}")
+def request_get(session_token: str = Header(...), request_id: int = Path(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    request_to_get = None
+    if get_processed:
+        request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(Requests.id == request_id).first()
+    else:
+        request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & Requests.id == request_id).first()
+    if not request_to_get: return {"message": "Couldn't find request"}, 404
+    if not request_user.role.role == 'leder':
+        if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.requested_by): 
+            if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.user_id):
+                return {"message": "Invalid Permissions"}, 401
+    return {"message": "Successfully got request", "request": request_to_get}, 200
 
-@app.get("/request")
-def request_get():
-    pass
+@app.get("/requests/{user_id}&{get_processed}")
+def user_requests_get(session_token: str = Header(...), user_id: int = Path(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    requests_to_get = None
+    if get_processed:
+        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Requests.user_id == user_id) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
+    else:
+        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & (Requests.user_id == user_id) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
+    if not requests_to_get: return {"message": "Couldn't find request"}, 404
+    return {"message": "Successfully got requests", "requests": requests_to_get}, 200
+    
 
-@app.get("/requests/{user_id}")
-def user_requests_get():
-    pass
+@app.get("/requests/{get_processed}")
+def requests_get(session_token: str = Header(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    requests_to_get = None
+    if get_processed:
+        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
+    else:
+        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(Processed_Requests.id.is_(None) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
+    if not requests_to_get: return {"message": "Couldn't find request"}, 404
 
-@app.get("/requests")
-def requests_get():
-    pass
+    return {"message": "Successfully got request", "request": requests_to_get}, 200
+    
+
+@app.post("/process_request")
+def process_request(session_token: str = Header(...), process_request: Process_Request = Body(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    processed_request = Processed_Requests(
+        request_id=process_request.request_id,
+        accepted=process_request.accepted,
+        reason=process_request.reason,
+        admin_id=request_user.id
+    )
+    db.add(processed_request)
+    db.commit()
+    db.refresh(processed_request)
+    log(f"Request with id \"{processed_request}\" has been processed", request_user.id, db)
+    return {"message": "Successfully processed request"}, 201
+
+@app.get("/roles")
+def roles_get(session_token: str = Header(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    roles = db.query(Roles).all()
+    return {"message": "Successfully got roles", "roles": roles}, 200
+
+@app.get("/request_types")
+def request_types_get(session_token: str = Header(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    request_types = db.query(Request_Types).all()
+    return {"message": "Successfully got request types", "request_types": request_types}, 200
 
 def log(event: str, user_id: int, db: Session):
     new_log = Logs(
