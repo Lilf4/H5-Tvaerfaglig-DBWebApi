@@ -338,7 +338,6 @@ def gen_check_in_code():
     GenTime = datetime.now()
     CurrCheckInCode = new_code
 
-#TODO: TODO: TODO: TODO
 @app.post("/request")
 def request_create(session_token: str = Header(...), request: Request = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
