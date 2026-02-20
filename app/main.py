@@ -1,7 +1,8 @@
 import asyncio, random, string
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Body, Header, Path
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
@@ -22,8 +23,6 @@ try:
     seed_defaults(db)
 finally:
     db.close()
-
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -52,6 +51,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+
 def get_db():
     db = SessionLocal()
     try:
@@ -72,9 +80,25 @@ def validate_session(session_token: str, db: Session):
     else:
         return None
 
-@app.get("/")
-def read_root():
-    return {"message": "API running"}
+@app.get("/valid_session")
+def validate_session_token(session_token: str = Header(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Session is not valid"}, 400
+    return {"message": "Valid session"}, 200
+
+@app.get("/self")
+def self_get(session_token: str = Header(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Session is not valid"}, 400
+    return {"message": "Successfully got user", "user": {
+        "id": request_user.id,
+        "username": request_user.username,
+        "name": request_user.name,
+        "role": {
+            "id": request_user.role.id,
+            "role": request_user.role.role
+        }
+    }}, 200
 
 @app.post("/login")
 def login(username: str = Body(...), password: str = Body(...), db: Session = Depends(get_db)):
