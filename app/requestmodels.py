@@ -3,9 +3,9 @@ from datetime import datetime, time
 
 @dataclass
 class User:
-    name: str = None
-    username: str = None
-    password: str = None
+    name: str|None = None
+    username: str|None = None
+    password: str|None = None
     role_id: int = -1
 
 
@@ -19,7 +19,7 @@ class Schedule_Times:
 
 @dataclass
 class Request:
-    reason: str = None
+    reason: str|None = None
     startDay: datetime = None
     endDay: datetime = None
     type_id: int = -1
@@ -29,4 +29,4 @@ class Request:
 class Process_Request:
     request_id: int = -1
     accepted: bool = None
-    reason: str = None
+    reason: str|None = None

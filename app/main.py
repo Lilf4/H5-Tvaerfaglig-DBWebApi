@@ -94,6 +94,7 @@ def self_get(session_token: str = Header(...), db: Session = Depends(get_db)):
         "id": request_user.id,
         "username": request_user.username,
         "name": request_user.name,
+        "created_at": request_user.created_at,
         "role": {
             "id": request_user.role.id,
             "role": request_user.role.role
@@ -144,7 +145,7 @@ def user_create(session_token: str = Header(...), user: User = Body(...), db: Se
         return {"message": "Invalid session"}, 401
 
 @app.put("/user/{user_id}")
-def user_update(session_token: str = Header(...), user_id: int = Path(...), user: User = Body(None), db: Session = Depends(get_db)):
+def user_update(session_token: str = Header(...), user_id: int = Path(...), user: User = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if request_user:
         if request_user.role.role != 'leder' and request_user.id != user_id:
