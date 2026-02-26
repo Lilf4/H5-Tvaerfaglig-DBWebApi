@@ -322,11 +322,11 @@ def check_out_code_get(device_code: str = Header(...), db: Session = Depends(get
     if not request_device: return {"message": "Invalid device code"}, 400
     return {"message": "Sucessfully got check in code", "code": CurrCheckInCode}, 200
 
-@app.post("/check_in_out")
-def check_in(session_token: str = Header(...), check_in_code: str = Header(None), db: Session = Depends(get_db)):
+@app.post("/check_in_out/{user_id}")
+def check_in(user_id: int = Path(...), check_in_code: str = Header(None), db: Session = Depends(get_db)):
     global LastCheckInCode, GenTime, CurrCheckInCode
-    request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    request_user = db.query(Users).filter(Users.id == user_id).first()
+    if not request_user: return {"message": "Invalid user"}, 400
     if (check_in_code != CurrCheckInCode and not (check_in_code == LastCheckInCode and GenTime + timedelta(minutes=MinBufferTime) > datetime.now())):
         return {"message": "Invalid check in code"}, 400
     gen_check_in_code()
