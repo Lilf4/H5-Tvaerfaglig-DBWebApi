@@ -11,19 +11,19 @@ class User:
 
 @dataclass
 class Schedule_Times:
-    weekDay: int = -1
-    startTime: time = None
-    endTime: time = None
-    user_id: int = -1
-    inactive: bool = None
+    weekDay: int|None = -1
+    startTime: time|None = None
+    endTime: time|None = None
+    user_id: int|None = -1
+    inactive: bool|None = None
 
 @dataclass
 class Request:
     reason: str|None = None
-    startDay: datetime = None
-    endDay: datetime = None
-    type_id: int = -1
-    user_id: int = -1
+    startDay: datetime|None = None
+    endDay: datetime|None = None
+    type_id: int|None = -1
+    user_id: int|None = -1
 
 @dataclass
 class Process_Request:

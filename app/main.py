@@ -259,14 +259,14 @@ def scheduled_time_update(session_token: str = Header(...), schedule_id: int = P
     if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
     schedule_to_update = db.query(Scheduled_Times).filter(Scheduled_Times.id == schedule_id).first()
     if not schedule_to_update: return {"message": "Couldn't find schedule"}, 404
-    if schedule.weekDay != -1: schedule_to_update.weekDay = schedule.weekDay
-    if schedule.endTime: schedule_to_update.endTime = schedule.endTime
-    if schedule.startTime: schedule_to_update.weekDay = schedule.weekDay
-    if schedule.user_id != -1: schedule_to_update.user_id = schedule.user_id
-    if schedule.inactive != None: schedule_to_update.inactive = schedule.inactive
+    if schedule.weekDay is not None: schedule_to_update.weekDay = schedule.weekDay
+    if schedule.endTime is not None: schedule_to_update.endTime = schedule.endTime
+    if schedule.startTime is not None: schedule_to_update.startTime = schedule.startTime
+    if schedule.user_id is not None: schedule_to_update.user_id = schedule.user_id
+    if schedule.inactive is not None: schedule_to_update.inactive = schedule.inactive
     db.commit()
     log(f"Schedule with id \"{schedule_to_update.id}\" was updated", request_user.id, db)
-    return {"Sucessfully updated schedule"}, 200
+    return {"Successfully updated schedule"}, 200
 
 @app.delete("/scheduled_time/{schedule_id}", tags=["Schedule"])
 def scheduled_time_delete(session_token: str = Header(...), schedule_id: int = Path(...), db: Session = Depends(get_db)):
@@ -308,8 +308,8 @@ def check_in_devices_get(session_token: str = Header(...), db: Session = Depends
     if not check_in_devices_to_get: return {"message": "No devices found"}, 404
     return {"message": "Sucessfully got devices", "device": check_in_devices_to_get}, 200
 
-@app.delete("/check_in_device", tags=["Check-in"])
-def check_in_device_delete(session_token: str = Header(...), device_id: int = Body(...), db: Session = Depends(get_db)):
+@app.delete("/check_in_device/{device_id}", tags=["Check-in"])
+def check_in_device_delete(session_token: str = Header(...), device_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if not request_user: return {"message": "Invalid session"}, 400
     if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
