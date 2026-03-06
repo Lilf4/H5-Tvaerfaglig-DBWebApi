@@ -120,8 +120,8 @@ class Requests(Base):
 
 	id: Mapped[int] = mapped_column(primary_key=True)
 	reason: Mapped[str] = mapped_column(String(500))
-	startDay: Mapped[datetime] = mapped_column(Date())
-	endDay: Mapped[datetime] = mapped_column(Date())
+	startDay: Mapped[datetime.time] = mapped_column(DateTime(timezone=True))
+	endDay: Mapped[datetime.time] = mapped_column(DateTime(timezone=True),)
 	type_id: Mapped[int] = mapped_column(ForeignKey("request_types.id"))
 	user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 	requested_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
