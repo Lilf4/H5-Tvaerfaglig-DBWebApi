@@ -409,13 +409,14 @@ def request_get(session_token: str = Header(...), request_id: int = Path(...), g
     if get_processed:
         request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(Requests.id == request_id).first()
     else:
-        request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & Requests.id == request_id).first()
+        request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & (Requests.id == request_id)).first()
     if not request_to_get: return {"message": "Couldn't find request"}, 404
     if not request_user.role.role == 'leder':
         if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.requested_by): 
             if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.user_id):
                 return {"message": "Invalid Permissions"}, 401
-    return {"message": "Successfully got request", "request": request_to_get}, 200
+    processed = db.query(Processed_Requests).filter(Processed_Requests.request_id == request_to_get.id).first()
+    return {"message": "Successfully got request", "request": request_to_get, "processed": processed}, 200
 
 @app.get("/requests/{user_id}&{get_processed}", tags=["Request"])
 def user_requests_get(session_token: str = Header(...), user_id: int = Path(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
@@ -427,7 +428,16 @@ def user_requests_get(session_token: str = Header(...), user_id: int = Path(...)
     else:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & (Requests.user_id == user_id) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
     if not requests_to_get: return {"message": "Couldn't find request"}, 404
-    return {"message": "Successfully got requests", "requests": requests_to_get}, 200
+    
+    requests_with_processed = []
+    for request in requests_to_get:
+        processed = db.query(Processed_Requests).filter(Processed_Requests.request_id == request.id).first()
+        requests_with_processed.append({
+            "request": request,
+            "processed": processed
+        })
+    
+    return {"message": "Successfully got requests", "requests": requests_with_processed}, 200
     
 
 @app.get("/requests/{get_processed}", tags=["Request"])
@@ -438,10 +448,18 @@ def requests_get(session_token: str = Header(...), get_processed: bool = Path(..
     if get_processed:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
     else:
-        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(Processed_Requests.id.is_(None) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
+        requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
     if not requests_to_get: return {"message": "Couldn't find request"}, 404
 
-    return {"message": "Successfully got request", "request": requests_to_get}, 200
+    requests_with_processed = []
+    for request in requests_to_get:
+        processed = db.query(Processed_Requests).filter(Processed_Requests.request_id == request.id).first()
+        requests_with_processed.append({
+            "request": request,
+            "processed": processed
+        })
+    
+    return {"message": "Successfully got requests", "requests": requests_with_processed}, 200
     
 
 @app.post("/process_request", tags=["Request"])
