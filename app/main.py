@@ -1,7 +1,7 @@
 import asyncio, random, string
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Body, Header, Path
 from sqlalchemy import delete
@@ -85,7 +85,7 @@ def validate_session(session_token: str, db: Session):
 def validate_session_token(session_token: str = Header(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if not request_user: return {"message": "Session is not valid"}, 400
-    return {"message": "Valid session"}, 200
+    return {"message": "Valid session"}, status.HTTP_200_OK
 
 @app.get("/self", tags=["Session"])
 def self_get(session_token: str = Header(...), db: Session = Depends(get_db)):
@@ -100,7 +100,7 @@ def self_get(session_token: str = Header(...), db: Session = Depends(get_db)):
             "id": request_user.role.id,
             "role": request_user.role.role
         }
-    }}, 200
+    }}, status.HTTP_200_OK
 
 @app.post("/login", tags=["Session"])
 def login(username: str = Body(...), password: str = Body(...), db: Session = Depends(get_db)):
@@ -114,7 +114,7 @@ def login(username: str = Body(...), password: str = Body(...), db: Session = De
         log(f"User logged in", user.id, db)
 
         return {"message": "Login successful", "user_id": user.id, "session_token": session.session_token}, 200
-    return {"message": "Invalid username or password"}, 401
+    return {"message": "Invalid username or password"}, status.HTTP_401_UNAUTHORIZED
 
 @app.post("/logout", tags=["Session"])
 def logout(session_token: str = Header(...), db: Session = Depends(get_db)):
@@ -123,36 +123,36 @@ def logout(session_token: str = Header(...), db: Session = Depends(get_db)):
         log("User logged out", session.user.id, db)
         db.delete(session)
         db.commit()
-        return {"message": "Successfully logged out"}, 200
+        return {"message": "Successfully logged out"}, status.HTTP_200_OK
     else:
-        return {"message": "Invalid session token"}, 401
+        return {"message": "Invalid session token"}, status.HTTP_401_UNAUTHORIZED
 
 @app.post("/user", tags=["User"])
 def user_create(session_token: str = Header(...), user: User = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if request_user:
         if request_user.role.role != 'leder':
-            return {"message": "Invalid Permissions"}, 403
+            return {"message": "Invalid Permissions"}, status.HTTP_403_FORBIDDEN
         new_user = Users(username=user.username, name=user.name, hashed_pass=get_password_hash(user.password), role_id=user.role_id)
         try:
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
         except Exception:
-            return {"message": "User already exists"}, 400
+            return {"message": "User already exists"}, status.HTTP_400_BAD_REQUEST
         log(f"User with id \"{new_user.id}\" was created", request_user.id, db)
-        return {"message": "Creation Successful"}, 201
+        return {"message": "Creation Successful"}, status.HTTP_201_CREATED
     else:
-        return {"message": "Invalid session"}, 401
+        return {"message": "Invalid session"}, status.HTTP_401_UNAUTHORIZED
 
 @app.put("/user/{user_id}", tags=["User"])
 def user_update(session_token: str = Header(...), user_id: int = Path(...), user: User = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if request_user:
         if request_user.role.role != 'leder' and request_user.id != user_id:
-            return {"message": "Invalid Permissions"}, 403
+            return {"message": "Invalid Permissions"}, status.HTTP_403_FORBIDDEN
         user_to_update = db.query(Users).filter(Users.id == user_id).first()
-        if not user_to_update: return {"message": "Couldn't find user"}, 404
+        if not user_to_update: return {"message": "Couldn't find user"}, status.HTTP_404_NOT_FOUND
         if user.name:
             user_to_update.name = user.name
         if user.username:
@@ -163,25 +163,25 @@ def user_update(session_token: str = Header(...), user_id: int = Path(...), user
             user_to_update.role_id = user.role_id
         db.commit()
         log(f"User with id \"{user_id}\" was updated", request_user.id, db)
-        return {"message": "User updated successfully"}, 200
+        return {"message": "User updated successfully"}, status.HTTP_200_OK
     else:
-        return {"message": "Invalid session"}, 401
+        return {"message": "Invalid session"}, status.HTTP_401_UNAUTHORIZED
 
 @app.delete("/user/{user_id}", tags=["User"])
 def user_delete(session_token: str = Header(...), user_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     if request_user:
         if request_user.role.role != 'leder':
-            return {"message": "Invalid Permissions"}, 403
+            return {"message": "Invalid Permissions"}, status.HTTP_403_FORBIDDEN
         user_to_delete = db.query(Users).filter(Users.id == user_id).first()
         if not user_to_delete:
-            return {"message": "User not found"}, 404
+            return {"message": "User not found"}, status.HTTP_404_NOT_FOUND
         db.delete(user_to_delete)
         db.commit()
         log(f"User with id \"{user_id}\" was deleted", request_user.id, db)
-        return {"message": "User deleted successfully"}, 200
+        return {"message": "User deleted successfully"}, status.HTTP_200_OK
     else:
-        return {"message": "Session token is required"}, 400
+        return {"message": "Session token is required"}, status.HTTP_400_BAD_REQUEST
 
 @app.get("/user/{user_id}", tags=["User"])
 def user_get(session_token: str = Header(None), user_id: int = Path(...), db: Session = Depends(get_db)):
@@ -189,14 +189,14 @@ def user_get(session_token: str = Header(None), user_id: int = Path(...), db: Se
     if session_token:
         request_user = validate_session(session_token, db)
     user_to_get = db.query(Users).filter(Users.id == user_id).first()
-    if not user_to_get: return {"message": "User not found"}, 404
+    if not user_to_get: return {"message": "User not found"}, status.HTTP_404_NOT_FOUND
     return {"message": "Succesfully got user", "user": {
         "id": user_to_get.id, 
         "username": user_to_get.username, 
         "name": user_to_get.name if (request_user and (request_user.role.role == 'leder' or user_to_get.id == request_user.id)) else None,
         "role": user_to_get.role,
         "created_at": user_to_get.created_at
-    }}, 200
+    }}, status.HTTP_200_OK
 
 
 @app.get("/users/", tags=["User"])
@@ -205,7 +205,7 @@ def users_get(session_token: str = Header(None), amount: int = 10, page: int = 1
     if session_token:
         request_user = validate_session(session_token, db)
     user_to_get = db.query(Users).offset((page - 1) * amount).limit(amount).all()
-    if not user_to_get: return {"message": "User not found"}, 404
+    if not user_to_get: return {"message": "User not found"}, status.HTTP_404_NOT_FOUND
     users_list = [
         {
             "id": user.id, 
@@ -214,13 +214,13 @@ def users_get(session_token: str = Header(None), amount: int = 10, page: int = 1
             "role": user.role,
             "created_at": user.created_at
         } for user in user_to_get]
-    return {"message": "Succesfully got users", "users": users_list}, 200
+    return {"message": "Succesfully got users", "users": users_list}, status.HTTP_200_OK
 
 @app.post("/scheduled_time", tags=["Schedule"])
 def scheduled_time_create(session_token: str = Header(...), schedule: Schedule_Times = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     new_schedule = Scheduled_Times(
         weekDay=schedule.weekDay,
         startTime=schedule.startTime,
@@ -232,33 +232,33 @@ def scheduled_time_create(session_token: str = Header(...), schedule: Schedule_T
     db.commit()
     db.refresh(new_schedule)
     log(f"Schedule with id \"{new_schedule.id}\" was created", request_user.id, db)
-    return {"message": "Successfully created schedule"}, 201
+    return {"message": "Successfully created schedule"}, status.HTTP_201_CREATED
 
 @app.get("/scheduled_time/{schedule_id}", tags=["Schedule"])
 def schedule_time_get(session_token: str = Header(...), schedule_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
     schedule = db.query(Scheduled_Times).filter(Scheduled_Times.id == schedule_id).first()
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     if not request_user.role.role == 'leder' and (not request_user.role.role == 'leder' and not request_user.id == schedule.user_id): return {"message": "Invalid Permissions"}, 401
     scheduled_time = db.query(Scheduled_Times).filter(Scheduled_Times.id == schedule_id).first()
-    return {"message": "Succesfully got schedules", "schedule": scheduled_time}, 200
+    return {"message": "Succesfully got schedules", "schedule": scheduled_time}, status.HTTP_200_OK
 
 @app.get("/scheduled_times/{user_id}", tags=["Schedule"])
 def schedule_times_get(session_token: str = Header(...), user_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     if not request_user.role.role == 'leder' and (not request_user.role.role == 'leder' and not request_user.id == user_id): return {"message": "Invalid Permissions"}, 401
     scheduled_times = db.query(Scheduled_Times).filter(Scheduled_Times.user_id == user_id).all()
-    return {"message": "Succesfully got schedules", "schedules": scheduled_times}, 200
+    return {"message": "Succesfully got schedules", "schedules": scheduled_times}, status.HTTP_200_OK
 
 
 @app.put("/scheduled_time/{schedule_id}", tags=["Schedule"])
 def scheduled_time_update(session_token: str = Header(...), schedule_id: int = Path(...), schedule: Schedule_Times = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     schedule_to_update = db.query(Scheduled_Times).filter(Scheduled_Times.id == schedule_id).first()
-    if not schedule_to_update: return {"message": "Couldn't find schedule"}, 404
+    if not schedule_to_update: return {"message": "Couldn't find schedule"}, status.HTTP_404_NOT_FOUND
     if schedule.weekDay is not None: schedule_to_update.weekDay = schedule.weekDay
     if schedule.endTime is not None: schedule_to_update.endTime = schedule.endTime
     if schedule.startTime is not None: schedule_to_update.startTime = schedule.startTime
@@ -266,80 +266,81 @@ def scheduled_time_update(session_token: str = Header(...), schedule_id: int = P
     if schedule.inactive is not None: schedule_to_update.inactive = schedule.inactive
     db.commit()
     log(f"Schedule with id \"{schedule_to_update.id}\" was updated", request_user.id, db)
-    return {"Successfully updated schedule"}, 200
+    return {"Successfully updated schedule"}, status.HTTP_200_OK
 
 @app.delete("/scheduled_time/{schedule_id}", tags=["Schedule"])
 def scheduled_time_delete(session_token: str = Header(...), schedule_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     schedule_to_update = db.query(Scheduled_Times).filter(Scheduled_Times.id == schedule_id).first()
-    if not schedule_to_update: return {"message": "Couldn't find schedule"}, 404
+    if not schedule_to_update: return {"message": "Couldn't find schedule"}, status.HTTP_404_NOT_FOUND
     log(f"Schedule with id \"{schedule_to_update.id}\" was deleted", request_user.id, db)
     db.delete(schedule_to_update)
     db.commit()
-    return {"Sucessfully deleted schedule"}, 200
+    return {"Sucessfully deleted schedule"}, status.HTTP_200_OK
 
 
 @app.get("/worked_times/{user_id}", tags=["Worked Time"])
 def worked_time_get(session_token: str = Header(...), user_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     worked_times = db.query(Worked_Times).filter(Worked_Times.user_id == user_id).all()
-    return {"message": "Succesfully got worked times", "worked_times": worked_times}, 200
+    return {"message": "Succesfully got worked times", "worked_times": worked_times}, status.HTTP_200_OK
 
 @app.post("/check_in_device/{device_name}", tags=["Check-in"])
 def check_in_device_create(session_token: str = Header(...), device_name: str = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     check_in_device = CheckinDeviceCode(name=device_name)
     db.add(check_in_device)
     log(f"Created device with id \"{check_in_device.id}\"", request_user.id, db)
-    return {"message": "Succesfully created device"}, 201
+    return {"message": "Succesfully created device"}, status.HTTP_201_CREATED
 
 @app.get("/check_in_device/{device_id}", tags=["Check-in"])
 def check_in_device_get(session_token: str = Header(...), device_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     check_in_device_to_get = db.query(CheckinDeviceCode).filter(CheckinDeviceCode.id == device_id).first()
-    if not check_in_device_to_get: return {"message": "Device not found"}, 404
-    return {"message": "Sucessfully got device", "device": check_in_device_to_get}, 200
+    if not check_in_device_to_get: return {"message": "Device not found"}, status.HTTP_404_NOT_FOUND
+    return {"message": "Sucessfully got device", "device": check_in_device_to_get}, status.HTTP_200_OK
 
 @app.get("/check_in_devices", tags=["Check-in"])
 def check_in_devices_get(session_token: str = Header(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     check_in_devices_to_get = db.query(CheckinDeviceCode).all()
-    if not check_in_devices_to_get: return {"message": "No devices found"}, 404
-    return {"message": "Sucessfully got devices", "device": check_in_devices_to_get}, 200
+    if not check_in_devices_to_get: return {"message": "No devices found"}, status.HTTP_404_NOT_FOUND
+    return {"message": "Sucessfully got devices", "device": check_in_devices_to_get}, status.HTTP_200_OK
 
 @app.delete("/check_in_device/{device_id}", tags=["Check-in"])
 def check_in_device_delete(session_token: str = Header(...), device_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     check_in_device_to_get = db.query(CheckinDeviceCode).filter(CheckinDeviceCode.id == device_id).first()
-    if not check_in_device_to_get: return {"message": "Device not found"}, 404
+    if not check_in_device_to_get: return {"message": "Device not found"}, status.HTTP_404_NOT_FOUND
     log(f"Device with id \"{check_in_device_to_get.id}\" was deleted", request_user.id, db)
     db.delete(check_in_device_to_get)
     db.commit()
+    return {"Sucessfully deleted device"}, status.HTTP_200_OK
 
 @app.get("/check_in_code", tags=["Check-in"])
 def check_out_code_get(device_code: str = Header(...), db: Session = Depends(get_db)):
     request_device = db.query(CheckinDeviceCode).filter(CheckinDeviceCode.code == device_code).first()
-    if not request_device: return {"message": "Invalid device code"}, 400
-    return {"message": "Sucessfully got check in code", "code": CurrCheckInCode}, 200
+    if not request_device: return {"message": "Invalid device code"}, status.HTTP_400_BAD_REQUEST
+    return {"message": "Sucessfully got check in code", "code": CurrCheckInCode}, status.HTTP_200_OK
 
 @app.post("/check_in_out/{user_id}", tags=["Check-in"])
 def check_in(user_id: int = Path(...), check_in_code: str = Header(None), db: Session = Depends(get_db)):
     global LastCheckInCode, GenTime, CurrCheckInCode
     request_user = db.query(Users).filter(Users.id == user_id).first()
-    if not request_user: return {"message": "Invalid user"}, 400
+    if not request_user: return {"message": "Invalid user"}, status.HTTP_400_BAD_REQUEST
     if (check_in_code != CurrCheckInCode and not (check_in_code == LastCheckInCode and GenTime + timedelta(minutes=MinBufferTime) > datetime.now())):
-        return {"message": "Invalid check in code"}, 400
+        return {"message": "Invalid check in code"}, status.HTTP_400_BAD_REQUEST
     gen_check_in_code()
     gen_check_in_code()
     curr_work_time = db.query(Worked_Times).filter(
@@ -358,13 +359,13 @@ def check_in(user_id: int = Path(...), check_in_code: str = Header(None), db: Se
         log(f"User has checked in", request_user.id, db)
         db.add(new_work_time)
         db.commit()
-        return {"message": "Sucessfully checked in"}
+        return {"message": "Sucessfully checked in"}, status.HTTP_200_OK
     else:
         log(f"User has checked out", request_user.id, db)
         curr_work_time.actualEnd = datetime.now().time()
         curr_work_time.active=False
         db.commit()
-        return {"message": "Sucessfully checked out"}
+        return {"message": "Sucessfully checked out"}, status.HTTP_200_OK
 
 def gen_check_in_code():
     length = 16
@@ -377,7 +378,7 @@ def gen_check_in_code():
 @app.post("/request", tags=["Request"])
 def request_create(session_token: str = Header(...), request: Request = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     new_request = Requests(
         startDay=request.startDay,
         endDay=request.endDay,
@@ -390,52 +391,52 @@ def request_create(session_token: str = Header(...), request: Request = Body(...
     db.commit()
     db.refresh(new_request)
     log(f"Request with id \"{new_request.id}\" has been created", request_user.id, db)
-    return {"message": "request sucessfully created"}, 201
+    return {"message": "request sucessfully created"}, status.HTTP_201_CREATED
 
 @app.delete("/request/{request_id}", tags=["Request"])
 def request_delete(session_token: str = Header(...), request_id: int = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     request_to_delete = db.query(Requests).filter(Requests.id == request_id).first()
-    if not request_to_delete: return {"message": "Couldn't find request"}, 404
+    if not request_to_delete: return {"message": "Couldn't find request"}, status.HTTP_404_NOT_FOUND
     if not request_user.role.role == 'leder':
         if (not request_user.role.role == 'leder' and not request_user.id == request_to_delete.requested_by): 
             if (not request_user.role.role == 'leder' and not request_user.id == request_to_delete.user_id):
-                return {"message": "Invalid Permissions"}, 401
+                return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     processed_request = db.query(Processed_Requests).filter(Processed_Requests.request_id == request_to_delete.id).first()
-    if processed_request: return {"message": "Can't delete processed request"}, 405
+    if processed_request: return {"message": "Can't delete processed request"}, status.HTTP_405_METHOD_NOT_ALLOWED
     log(f"Request with id \"{request_to_delete.id}\" has been deleted", request_user.id, db)
     db.delete(request_to_delete)
     db.commit()
-    return {"message": "Successfully deleted request"}, 200
+    return {"message": "Successfully deleted request"}, status.HTTP_200_OK
 
 @app.get("/request/{request_id}&{get_processed}", tags=["Request"])
 def request_get(session_token: str = Header(...), request_id: int = Path(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     request_to_get = None
     if get_processed:
         request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(Requests.id == request_id).first()
     else:
         request_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & (Requests.id == request_id)).first()
-    if not request_to_get: return {"message": "Couldn't find request"}, 404
+    if not request_to_get: return {"message": "Couldn't find request"}, status.HTTP_404_NOT_FOUND
     if not request_user.role.role == 'leder':
         if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.requested_by): 
             if (not request_user.role.role == 'leder' and not request_user.id == request_to_get.user_id):
-                return {"message": "Invalid Permissions"}, 401
+                return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     processed = db.query(Processed_Requests).filter(Processed_Requests.request_id == request_to_get.id).first()
     return {"message": "Successfully got request", "request": request_to_get, "processed": processed}, 200
 
 @app.get("/requests/{user_id}&{get_processed}", tags=["Request"])
 def user_requests_get(session_token: str = Header(...), user_id: int = Path(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     requests_to_get = None
     if get_processed:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Requests.user_id == user_id) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
     else:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & (Requests.user_id == user_id) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
-    if not requests_to_get: return {"message": "Couldn't find request"}, 404
+    if not requests_to_get: return {"message": "Couldn't find request"}, status.HTTP_404_NOT_FOUND
     
     requests_with_processed = []
     for request in requests_to_get:
@@ -445,19 +446,19 @@ def user_requests_get(session_token: str = Header(...), user_id: int = Path(...)
             "processed": processed
         })
     
-    return {"message": "Successfully got requests", "requests": requests_with_processed}, 200
+    return {"message": "Successfully got requests", "requests": requests_with_processed}, status.HTTP_200_OK
     
 
 @app.get("/requests/{get_processed}", tags=["Request"])
 def requests_get(session_token: str = Header(...), get_processed: bool = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     requests_to_get = None
     if get_processed:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter(or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
     else:
         requests_to_get = db.query(Requests).outerjoin(Processed_Requests).filter((Processed_Requests.id.is_(None)) & or_(or_(Requests.user_id == request_user.id, Requests.requested_by == request_user.id), request_user.role.role == 'leder')).all()
-    if not requests_to_get: return {"message": "Couldn't find request"}, 404
+    if not requests_to_get: return {"message": "Couldn't find request"}, status.HTTP_404_NOT_FOUND
 
     requests_with_processed = []
     for request in requests_to_get:
@@ -467,16 +468,16 @@ def requests_get(session_token: str = Header(...), get_processed: bool = Path(..
             "processed": processed
         })
     
-    return {"message": "Successfully got requests", "requests": requests_with_processed}, 200
+    return {"message": "Successfully got requests", "requests": requests_with_processed}, status.HTTP_200_OK
     
 
 @app.post("/process_request", tags=["Request"])
 def process_request(session_token: str = Header(...), process_request: Process_Request = Body(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
-    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, 401
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
+    if not request_user.role.role == 'leder': return {"message": "Invalid Permissions"}, status.HTTP_401_UNAUTHORIZED
     process_request_check = db.query(Processed_Requests).filter(Processed_Requests.request_id == process_request.request_id).first()
-    if process_request_check: return {"message": "Cannot process already processed request"}, 400 
+    if process_request_check: return {"message": "Cannot process already processed request"}, status.HTTP_400_BAD_REQUEST
     processed_request = Processed_Requests(
         request_id=process_request.request_id,
         accepted=process_request.accepted,
@@ -487,21 +488,21 @@ def process_request(session_token: str = Header(...), process_request: Process_R
     db.commit()
     db.refresh(processed_request)
     log(f"Request with id \"{processed_request}\" has been processed", request_user.id, db)
-    return {"message": "Successfully processed request"}, 201
+    return {"message": "Successfully processed request"}, status.HTTP_201_CREATED
 
 @app.get("/request_types", tags=["Request"])
 def request_types_get(session_token: str = Header(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     request_types = db.query(Request_Types).all()
-    return {"message": "Successfully got request types", "request_types": request_types}, 200
+    return {"message": "Successfully got request types", "request_types": request_types}, status.HTTP_200_OK
 
 @app.get("/roles", tags=["Roles"])
 def roles_get(session_token: str = Header(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
-    if not request_user: return {"message": "Invalid session"}, 400
+    if not request_user: return {"message": "Invalid session"}, status.HTTP_400_BAD_REQUEST
     roles = db.query(Roles).all()
-    return {"message": "Successfully got roles", "roles": roles}, 200
+    return {"message": "Successfully got roles", "roles": roles}, status.HTTP_200_OK
 
 
 def log(event: str, user_id: int, db: Session):
