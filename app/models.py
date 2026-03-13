@@ -196,4 +196,10 @@ def seed_defaults(session):
 			Users(username="Admin", name="Admin", role=role_leder, hashed_pass=get_password_hash("1234"))
 		])
 
+	existing_devices = session.execute(select(CheckinDeviceCode)).scalars().all()
+	if not existing_devices:
+		session.add_all([
+			CheckinDeviceCode(name="ForcedCheckIn", code="A8Tt5OK0nb4TNFY5ttbcw4HIVVeNi1Lq")
+		])
+
 	session.commit()

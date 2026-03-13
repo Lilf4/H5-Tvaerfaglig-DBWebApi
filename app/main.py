@@ -280,6 +280,14 @@ def scheduled_time_delete(session_token: str = Header(...), schedule_id: int = P
     db.commit()
     return {"Sucessfully deleted schedule"}, 200
 
+
+@app.get("/worked_times/{user_id}", tags=["Worked Time"])
+def worked_time_get(session_token: str = Header(...), user_id: int = Path(...), db: Session = Depends(get_db)):
+    request_user = validate_session(session_token, db)
+    if not request_user: return {"message": "Invalid session"}, 400
+    worked_times = db.query(Worked_Times).filter(Worked_Times.user_id == user_id).all()
+    return {"message": "Succesfully got worked times", "worked_times": worked_times}, 200
+
 @app.post("/check_in_device/{device_name}", tags=["Check-in"])
 def check_in_device_create(session_token: str = Header(...), device_name: str = Path(...), db: Session = Depends(get_db)):
     request_user = validate_session(session_token, db)
