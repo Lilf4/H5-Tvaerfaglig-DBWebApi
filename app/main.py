@@ -199,7 +199,7 @@ def user_get(session_token: str = Header(None), user_id: int = Path(...), db: Se
     }}, status.HTTP_200_OK
 
 
-@app.get("/users/", tags=["User"])
+@app.get("/users", tags=["User"])
 def users_get(session_token: str = Header(None), amount: int = 10, page: int = 1, db: Session = Depends(get_db)):
     request_user = None
     if session_token:
