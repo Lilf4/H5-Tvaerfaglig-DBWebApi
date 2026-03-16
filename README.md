@@ -1,20 +1,65 @@
-Dette er min WebAPI / Database
+# WebAPI / Database
 
-For at køre dette skal du bruge Docker/docker-compose.
+Dette projekt kører som en **WebAPI med database** via Docker / Docker Compose.
 
-Før du kan køre det skal du lave en ny fil der heder .env du kan også kopier .env.example og omdøb den.
+## Krav
 
-Heri skal du definere 2 Enviorenment Variabler:
-Env Variable | Indhold | Eksemple
---- | --- | ---
-DATABASE_URL | Dette url til database, da databasen er SQLite kan du bare kopier Eksemplet her | sqlite:///./data/app.db
-API_PORT | Dette er porten denne API skal køre på | 8000
+For at køre projektet skal følgende være installeret:
 
-Når disse er defineret kan du køre<br>
-`docker-compose up -d`<br>
-For at køre programmet i baggrunden og så kan du gå til `localhost:API_PORT/docs` og se en genereret Swagger page
+- Docker
+- docker-compose
 
-Når du vil ligge det ned igen kan du køre<br>
-`docker-compose down`<br>
-Herefter kan du køre dette for at sikre containers/volumes bliver slettet korrekt<br>
-`docker-compose rm`
+---
+
+# Opsætning
+
+Før du kan køre projektet, skal du oprette en `.env` fil.
+
+Du kan enten:
+
+- oprette en ny fil kaldet `.env`
+- eller kopiere `.env.example` og omdøbe den
+---
+
+# Environment Variables
+
+I `.env` filen skal følgende variabler defineres:
+
+| Env Variable | Beskrivelse | Eksempel |
+|---|---|---|
+| DATABASE_URL | URL til databasen. Da databasen er SQLite kan du bare bruge eksemplet | sqlite:///./data/app.db |
+| API_PORT | Port som WebAPI skal køre på | 8000 |
+
+---
+
+# Start WebAPI
+
+Når variablerne er defineret kan du starte API’en:
+
+```bash
+docker-compose up -d
+```
+
+Dette starter API’en i baggrunden.
+
+Herefter kan du åbne den genererede Swagger-side i browseren:
+
+```
+http://localhost:API_PORT/docs
+```
+
+---
+
+# Stop API
+
+For at stoppe API’en:
+
+```bash
+docker-compose down
+```
+
+For også at fjerne containers og volumes:
+
+```bash
+docker-compose rm
+```
